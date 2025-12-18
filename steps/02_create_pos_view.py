@@ -1,7 +1,11 @@
 from snowflake.snowpark import Session
 import snowflake.snowpark.functions as F
 
+from utils.logger import get_logger
+
 from utils.helpers import load_snowflake_connection_params
+
+logger = get_logger(__name__)
 
 
 def create_pos_view(session: Session):
@@ -110,6 +114,7 @@ def create_pos_view_stream(session: Session):
     Create a Snowflake STREAM object against the POS_FLATTENED_V view
     this allows us to track CDC across separate tables
     """
+
     session.use_schema("HARMONIZED")
     _ = session.sql(
         """
@@ -128,10 +133,30 @@ def test_pos_view(session: Session):
 
 if __name__ == "__main__":
 
-    # load connection params
-    connection_params = load_snowflake_connection_params("snowflake_connection.json")
+    try:
+        logger.debug("Loading Snowflake connection params")
+        # load connection params
+        connection_params = load_snowflake_connection_params(
+            "snowflake_connection.json"
+        )
 
-    with Session.builder.confits(connection_params).create() as session:
-        create_pos_view(session)
-        create_pos_view_stream(session)
-        test_pos_view(session)
+    except Exception as e:
+        logger.error(f"Error loading Snowflake connection params: {e}")
+        raise
+
+    with Session.builder.configs(connection_params).create() as session:
+        logger.debug("Snowflake session created successfully")
+
+        try:
+            logger.debug("Creating POS flattened view and stream")
+            create_pos_view(session)
+            create_pos_view_stream(session)
+
+            logger.debug("Testing POS flattened view")
+            test_pos_view(session)
+
+            logger.info("POS flattened view and stream created and tested successfully")
+
+        except Exception as e:
+            logger.error(f"Error during POS view creation or testing: {e}")
+            raise
